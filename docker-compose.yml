@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  router1:
+    image: alpine:latest
+    container_name: vrrp-router1
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    networks:
+      vrrp_net:
+        ipv4_address: 192.168.100.10
+    volumes:
+      - ./router1-keepalived.conf:/etc/keepalived/keepalived.conf
+      - ./check_script.sh:/check_script.sh
+    hostname: router1
+    command: >
+      /bin/sh -c "
+      apk add --no-cache keepalived iproute2 iputils busybox-extras &&
+      cp /check_script.sh /usr/local/bin/check_script.sh &&
+      chmod +x /usr/local/bin/check_script.sh &&
+      echo 1 > /proc/sys/net/ipv4/ip_forward &&
+      mkdir -p /www &&
+      echo '<html><body><h1>🟢 ROUTER 1</h1><p>IP: 192.168.100.10</p><p>Status: ACTIVE</p></body></html>' > /www/index.html &&
+      httpd -p 80 -h /www &&
+      exec keepalived -n -l -D -f /etc/keepalived/keepalived.conf
+      "
+
+  router2:
+    image: alpine:latest
+    container_name: vrrp-router2
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    networks:
+      vrrp_net:
+        ipv4_address: 192.168.100.20
+    volumes:
+      - ./router2-keepalived.conf:/etc/keepalived/keepalived.conf
+      - ./check_script.sh:/check_script.sh
+    hostname: router2
+    command: >
+      /bin/sh -c "
+      apk add --no-cache keepalived iproute2 iputils busybox-extras &&
+      cp /check_script.sh /usr/local/bin/check_script.sh &&
+      chmod +x /usr/local/bin/check_script.sh &&
+      echo 1 > /proc/sys/net/ipv4/ip_forward &&
+      mkdir -p /www &&
+      echo '<html><body><h1>🔵 ROUTER 2</h1><p>IP: 192.168.100.20</p><p>Status: STANDBY</p></body></html>' > /www/index.html &&
+      httpd -p 80 -h /www &&
+      exec keepalived -n -l -D -f /etc/keepalived/keepalived.conf
+      "
+
+  client:
+    image: alpine:latest
+    container_name: vrrp-client
+    networks:
+      docker network ls:
+        ipv4_address: 192.168.100.50
+    command: /bin/sh -c "apk add --no-cache iputils curl && tail -f /dev/null"
+    hostname: client
+
+networks:
+  vrrp_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
