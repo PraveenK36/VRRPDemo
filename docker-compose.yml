@@ -59,7 +59,7 @@ services:
     image: alpine:latest
     container_name: vrrp-client
     networks:
-      docker network ls:
+      vrrp_net:
         ipv4_address: 192.168.100.50
     command: /bin/sh -c "apk add --no-cache iputils curl && tail -f /dev/null"
     hostname: client
